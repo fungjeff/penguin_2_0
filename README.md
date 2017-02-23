@@ -27,4 +27,4 @@ To Use:
 
 For post-production:
 
-A separate program is in read/ for reading grids placed in binary/. It uses the mathgl library for creating images that are stored in images/.
+A separate program is in the folder read/, which reads grids located in binary/ and performs various analyses. It uses the mathgl library for creating images that are stored in images/.
