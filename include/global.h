@@ -113,7 +113,7 @@ using namespace std;
 // GPU control
 //=======================================================================
 
-const int startid = 2;
+const int startid = 0;
 const int nDev = 1;                      // number of GPUs
 
 void P2P_all_enable(GPU_plan*);
