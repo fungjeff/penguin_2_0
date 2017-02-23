@@ -3,7 +3,9 @@ PEnGUIn with Orbital Advection
 
 To Compile:
 
-1. Create the following new directories under penguin_2_0/
+1. Make sure CUDA is installed.
+
+2. Create the following new directories under penguin_2_0/
 
   a) obj/
   
@@ -13,7 +15,7 @@ To Compile:
   
   d) images/
   
-2. Type 'make' inside penguin_2_0/ to create the executable 'penguin'
+3. Type 'make' inside penguin_2_0/ to create the executable 'penguin'
 
 To Use:
 
@@ -27,4 +29,4 @@ To Use:
 
 For post-production:
 
-A separate program is in the folder read/, which reads grids located in binary/ and performs various analyses. It uses the mathgl library for creating images that are stored in images/.
+A separate program is in the folder read/, which reads grids stored in binary/ and performs various analyses. It uses the mathgl library for creating images that are stored in images/.
