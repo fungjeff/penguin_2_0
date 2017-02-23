@@ -3,8 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
-#include "variable_types.h"
-#include "global.h"
+#include "post_global.h"
 #include "cuSafe.cu"
 
 //##################################################################################################
@@ -51,7 +50,7 @@ string path_to_cwd()
 
 
 //###################################### GPU CONTROL ############################################
-void P2P_all_enable(GPU_plan *set)
+void P2P_all_enable(GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
     for (int j=i+1; j<nDev; j++)
@@ -64,7 +63,7 @@ void P2P_all_enable(GPU_plan *set)
   return;
 }
 
-void P2P_all_disable(GPU_plan *set)
+void P2P_all_disable(GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
     for (int j=i+1; j<nDev; j++)
@@ -78,7 +77,7 @@ void P2P_all_disable(GPU_plan *set)
   return;
 }
 
-void syncstreams(GPU_plan *set)
+void syncstreams(GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
   {
@@ -87,7 +86,7 @@ void syncstreams(GPU_plan *set)
   return;
 }
 
-void syncdevices(GPU_plan *set)
+void syncdevices(GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
   {
@@ -97,7 +96,7 @@ void syncdevices(GPU_plan *set)
   return;
 }
 
-void syncallevents(GPU_plan *set)
+void syncallevents(GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
   {
@@ -106,7 +105,7 @@ void syncallevents(GPU_plan *set)
   return;
 }
 
-void syncallevents(int n, GPU_plan *set)
+void syncallevents(int n, GPU_plan *set, int nDev)
 {
   for (int i=0; i<nDev; i++)
   {
@@ -115,7 +114,7 @@ void syncallevents(int n, GPU_plan *set)
   return;
 }
 
-void reset_devices()
+void reset_devices(int nDev)
 {
   int d;
   cudaGetDevice(&d);
