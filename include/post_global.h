@@ -1,6 +1,31 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
+typedef double sdp;
+typedef double sdp;
+typedef double2 sdp2;
+
+using namespace std;
+
+//=======================================================================
+// GPU Arch and Grid Dim
+//=======================================================================
+
+#define ndim 2
+
+const int n_pad = 6;     //number of boundary zones on each side: 6 for ppm
+
+const int arrsize = 96;  //for optimal speed: arrsize = 32*(integer)
+const int realarr = arrsize - 2*n_pad;
+
+const int imax = 800;    //for optimal speed: imax = realarr*(integer)
+const int jmax = 3200;    //                  same for jmax and kmax
+const int kmax = 1;
+
+//=======================================================================
+// Constants
+//=======================================================================
+
 const sdp hpi = 1.570796326794896619231321691639751442;
 const sdp pi = 3.1415926535897932384626433832795;
 const sdp twopi = 6.283185307179586476925286766559;
@@ -12,80 +37,17 @@ const sdp JupiterMass = 0.001;
 const sdp smallp = 1.0e-15;
 const sdp smallr = 1.0e-15;
 
-#define flat_flag
-//#define bary_flag
-#define EOS 0                    // 0:isothermal 1:isentropic 2:energy(adiabatic)
-
-#define plnt_flag 1
-#define opac_flag 0
-#define kill_flag 0
-#define visc_flag 0
-#define BlHo_flag 0
-
-#define dump_flag 1
-#define file_flag 0
-
-//=======================================================================
-// Disk parameters
-//=======================================================================
-
-const sdp p_alpha = 1.5;
-const sdp p_beta = 0.0;
-const sdp ss_alpha = 0.01;
-const sdp sc_h = 0.035;
-const sdp vis_nu = 1.0e-5;
-
 //=======================================================================
 // Planet parameters
 //=======================================================================
 
-const sdp M_p = 1.0*EarthMass;
+const sdp M_p = 5.0*EarthMass;
 const sdp R_p = 1.0;
 const sdp epsilon = 0.5*sc_h*R_p * 0.5*sc_h*R_p;
-const sdp FrRot = 1.0;
-
-//=======================================================================
-// Hydro parameters
-//=======================================================================
-
-const sdp gam = 1.0;
-const sdp gamm = gam - 1.0;
-const sdp gamfac2 = gam + 1.0;
-const sdp gamfac1 = gamfac2/gam/2.0;
-const sdp gamz = gamm/gam/2.0;
-const sdp courant = 0.5;
-
-const int nlft = 3;
-const int nrgh = 3;
-const int nbac = 2;
-const int nfrn = 2;
-const int nudr = 3;
-const int ntop = 3;
-
-const sdp endtime = 10.0*twopi;
-const sdp tmovie = 1.0*twopi;
-
-const int ncycend = 1000000000;
-const int nprin = 50;
 
 //=======================================================================
 // Grid parameters
 //=======================================================================
-
-const sdp xmin = 0.4;
-const sdp xmax = 1.8;
-const sdp ymin = 0.0;
-const sdp ymax = twopi;
-const sdp zmin = hpi-0.065;//0.065;//0.088;//0.05;
-const sdp zmax = hpi;
-
-const int ngeomx = 1;
-const int ngeomy = 3;
-const int ngeomz = 0;
-
-const int grspx = 1;
-const int grspy = 0;
-const int grspz = 0;
 
 const sdp dx_min = 0.0012;
 const sdp dx_max = 0.002;
@@ -94,26 +56,126 @@ const sdp dy_max = 0.015;
 const sdp dz_min = 0.0005;
 const sdp dz_max = 0.002;
 
-using namespace std;
+const int ngeomx = 1;
+const int ngeomy = 3;
+const int ngeomz = 0;
 
-#define cmax(x,y) max(x,y)
-#define cmin(x,y) min(x,y)
-#define cabs(x) fabs(x)
-#define csqrt(x) sqrt(x)
-#define cexp(x) exp(x)
-#define clog(x) log(x)
-#define csin(x) sin(x)
-#define ccos(x) cos(x)
-#define ctan(x) tan(x)
-#define cpow(x,y) pow(x,y)
-#define sign(x) (( x > 0 ) - ( x < 0 ))
+//=======================================================================
+// Structures
+//=======================================================================
+
+struct body
+{
+  sdp m;
+  sdp x;
+  sdp y;
+  //sdp z;
+};
+
+struct SymDisk
+{
+  sdp r;
+  sdp p;
+  sdp u;
+  sdp v;
+  sdp w;
+};
+
+struct hydr_ring
+{
+  sdp r[jmax];
+  sdp p[jmax];
+  sdp u[jmax];
+  sdp v[jmax];
+  sdp w[jmax];
+
+  sdp x;
+  sdp dx;
+  sdp xvol;
+  sdp xc;
+
+  sdp y[jmax];
+  sdp dy[jmax];
+  sdp yvol[jmax];
+  sdp yc[jmax];
+
+  sdp z;
+  sdp dz;
+  sdp zvol;
+  sdp zc;
+
+  int i;
+  int k;
+
+  sdp rot_v;
+  sdp res_v;
+  int rot_j;
+  int inc_j;
+};
+
+struct GPU_plan
+{
+  int id;
+
+  int N_ring;
+
+  int istart;
+  int iblk;
+
+  int kstart;
+  int kblk;
+
+  long int memsize;
+
+  hydr_ring *rings;
+  hydr_ring *h_rings;
+
+  hydr_ring *lft;
+  hydr_ring *rgh;
+  hydr_ring *udr;
+  hydr_ring *top;
+
+  hydr_ring *cp_lft;
+  hydr_ring *cp_rgh;
+
+  SymDisk *val;
+
+  dim3 sx_grid;
+  dim3 sy_grid;
+  dim3 sz_grid;
+
+  dim3 t_grid;
+
+  sdp *dt;
+  sdp *h_dt;
+  sdp *dt_1D;
+  sdp *dt_2D;
+
+  sdp *h_output;
+  sdp *h_output1;
+  sdp *h_output2;
+  sdp *h_output3;
+  sdp *h_output4;
+  sdp *h_output5;
+
+  sdp *d_output;
+  sdp *d_output1;
+  sdp *d_output2;
+  sdp *d_output3;
+  sdp *d_output4;
+  sdp *d_output5;
+
+  cudaEvent_t event;
+
+  cudaStream_t stream;
+};
 
 //=======================================================================
 // GPU control
 //=======================================================================
 
 const int startid = 0;
-const int nDev = 1;
+//const int block_per_device = iblk*(jblk/nDev+1)*kblk;
 
 void P2P_all_enable(GPU_plan*);
 void P2P_all_disable(GPU_plan*);
