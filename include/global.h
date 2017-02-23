@@ -8,75 +8,76 @@ const sdp third = 0.3333333333333333333333333;
 const sdp fourthd = 1.3333333333333333333333333;
 const sdp EarthMass = 0.000003;
 const sdp NeptuneMass = 0.00005;
-const sdp JupiterMass = 0.001;
+const sdp JupiterMass = 0.005;
+const sdp MMSN_1AU = 0.00019126835;
 const sdp smallp = 1.0e-15;
 const sdp smallr = 1.0e-15;
 
-#define flat_flag
-//#define bary_flag
-#define EOS 0                    // 0:isothermal 1:isentropic 2:energy(adiabatic)
+#define flat_flag                // defined = ppm flattening at shocks
+//#define bary_flag              // defined = barycentric frame
+#define EOS 0                    // 0:isothermal 1:isentropic 2:energy(adiabatic; untested)
 
-#define plnt_flag 1
-#define opac_flag 0
-#define kill_flag 0
-#define visc_flag 0
-#define BlHo_flag 0
+#define plnt_flag 2              // 0:no planet 1:fixed planet 2:moving planet
+#define FrRot_flag 1             // 0:no frame roation 1:rotate with planet
+#define kill_flag 0              // 0:no killing zone 1:yes killing zone (not implemented yet)
+#define visc_flag 1              // 0:no viscosity 1:yes viscosity
+#define FARGO_flag 1             // 0:no orbital advection 1:yes orbital advection
 
-#define dump_flag 1
-#define file_flag 0
+#define dump_flag 1              // 0:no grid output 1:yes grid output
 
 //=======================================================================
 // Disk parameters
 //=======================================================================
 
-const sdp p_alpha = 1.5;
-const sdp p_beta = 0.0;
-const sdp ss_alpha = 0.01;
-const sdp sc_h = 0.035;
-const sdp vis_nu = 1.0e-5;
+const sdp p_alpha = 1.5;               // surface density ~ r^-p_alpha
+const sdp p_beta = 0.5;                // temperature ~ r^-p_beta
+const sdp ss_alpha = 0.0001;           // alpha-viscosity
+const sdp sc_h = 0.05;                 // scale height at r=1
+const sdp vis_nu = ss_alpha*sc_h*sc_h;          // kinematic viscosity
+const sdp Sigma_0 = 1.0*MMSN_1AU;      // density at r=1 in units of M_solar/AU^2
 
 //=======================================================================
 // Planet parameters
 //=======================================================================
 
-const sdp M_p = 1.0*EarthMass;
-const sdp R_p = 1.0;
-const sdp epsilon = 0.5*sc_h*R_p * 0.5*sc_h*R_p;
-const sdp FrRot = 1.0;
+const sdp M_p = 1.0*JupiterMass;       // planet mass
+const sdp R_p = 1.0;                   // radial distance
+const sdp t_growth = 1000.0*twopi;     // time to grow planet from 0 to M_p
+const sdp rs_fac = 0.5;                // smoothing length = rs_fac * scale height
 
 //=======================================================================
 // Hydro parameters
 //=======================================================================
 
-const sdp gam = 1.0;
+const sdp gam = 1.0;                   // adiabatic index
 const sdp gamm = gam - 1.0;
 const sdp gamfac2 = gam + 1.0;
 const sdp gamfac1 = gamfac2/gam/2.0;
 const sdp gamz = gamm/gam/2.0;
 const sdp courant = 0.5;
 
-const int nlft = 3;
-const int nrgh = 3;
-const int nbac = 2;
+const int nlft = 3;                    // 0:outflow 1:reflect 2:periodic 3:fixed boundary
+const int nrgh = 3;                    // only 3 is implemented
+const int nbac = 2;                    // nbac and nfrn are always 2
 const int nfrn = 2;
 const int nudr = 3;
 const int ntop = 3;
 
-const sdp endtime = 10.0*twopi;
-const sdp tmovie = 1.0*twopi;
+const sdp endtime = 10000.0*twopi;       // total simulation time
+const sdp tmovie = 200.0*twopi;          // time interval for dumping data if dump_flag=1
 
-const int ncycend = 1000000000;
-const int nprin = 50;
+const int ncycend = 1000000000;        // maximum number of time step
+const int nprin = 100;                 // step interval for printing information
 
 //=======================================================================
 // Grid parameters
 //=======================================================================
 
-const sdp xmin = 0.4;
-const sdp xmax = 1.8;
-const sdp ymin = 0.0;
+const sdp xmin = 0.2;                  
+const sdp xmax = 3.0;
+const sdp ymin = 0.0;                  
 const sdp ymax = twopi;
-const sdp zmin = hpi-0.065;//0.065;//0.088;//0.05;
+const sdp zmin = hpi-0.065;            
 const sdp zmax = hpi;
 
 const int ngeomx = 1;
@@ -112,8 +113,8 @@ using namespace std;
 // GPU control
 //=======================================================================
 
-const int startid = 0;
-const int nDev = 1;
+const int startid = 2;
+const int nDev = 1;                      // number of GPUs
 
 void P2P_all_enable(GPU_plan*);
 void P2P_all_disable(GPU_plan*);
