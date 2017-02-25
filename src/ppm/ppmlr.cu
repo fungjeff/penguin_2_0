@@ -1,5 +1,5 @@
 //================================================================================
-__device__ void ppmlr(sdp &rad, sdp &azi, sdp &pol, sdp v_rot,
+__device__ void ppmlr(sdp &rad, sdp &azi, sdp &pol, sdp v_rot, sdp FrRot,
                       sdp *r, sdp *p, sdp *u, sdp *v, sdp *w, sdp *e,
                       sdp *xa0, sdp *dx0, sdp &dvol0, 
                       int nmax, sdp &dt, int axis, body &planet)
@@ -39,7 +39,7 @@ __device__ void ppmlr(sdp &rad, sdp &azi, sdp &pol, sdp v_rot,
   sdp dvol = dvol0;
   sdp xa   = xa0[n];
   // do lagrangian update using umid and pmid
-  evolve( n, nmax, dt, axis, rad, azi, pol, v_rot, planet,
+  evolve( n, nmax, dt, axis, rad, azi, pol, v_rot, FrRot, planet,
           tmp1,//temporary variables
           umid, pmid, riemann_success,
           r, p, u, v, w, e, q,

@@ -1,14 +1,14 @@
 //=======================================================================================
 
 __device__ void evolve( int &n, int nmax, sdp &dt, int &axis,
-                        sdp &rad, sdp &azi, sdp &pol, sdp &v_rot, body &planet,
+                        sdp &rad, sdp &azi, sdp &pol, sdp &v_rot, sdp &FrRot, body &planet,
                         sdp *vfac,
                         sdp *umid, sdp *pmid, bool &riemann_success,
                         sdp *r, sdp *p, sdp *u, sdp *v, sdp *w, sdp *e, sdp *q,
                         sdp *xa0, sdp* dx0, sdp &dvol0, sdp &xa, sdp* dx, sdp &dvol)
 {
   sdp dtdm, delx;
-  sdp gra1, fto1, gra2, fto2;
+  sdp gra1, fto1, gra2, fto2;//, gra3, fto3, gra4, fto4;
   sdp dum, xcl;
 
   vfac[n] = xa0[n] + 0.5*dx0[n];
@@ -32,15 +32,7 @@ __device__ void evolve( int &n, int nmax, sdp &dt, int &axis,
     vfac[n] = xa0[n] + delx;
   }
   __syncthreads();
-/*
-  if (n==6 && blockIdx.x==0 && axis==1 && rad<1.3) printf("%i %e\n", n, umid[n]);
-  if (n==7 && blockIdx.x==0 && axis==1 && rad<1.3) printf("%i %e\n", n, umid[n]);
-  if (n==8 && blockIdx.x==0 && axis==1 && rad<1.3) printf("%i %e\n\n", n, umid[n]);
 
-  if (n==6 && blockIdx.x==234 && axis==1 && rad<1.3) printf("%i %e\n", n, umid[n]);
-  if (n==7 && blockIdx.x==234 && axis==1 && rad<1.3) printf("%i %e\n", n, umid[n]);
-  if (n==8 && blockIdx.x==234 && axis==1 && rad<1.3) printf("%i %e\n\n\n", n, umid[n]);
-*/
   if (n>=3 && n<nmax-3)
   {
     dx[n] = vfac[n+1] - vfac[n];
@@ -61,27 +53,17 @@ __device__ void evolve( int &n, int nmax, sdp &dt, int &axis,
     if (axis==0)
     {
       get_fx(n, 0.0, rad, azi, pol, gra1, fto1, planet, r, p, u, v, w);
-      get_fx(n,  dt, xcl, azi+dt*v_rot, pol, gra2, fto2, planet, r, p, u, v, w);
+      get_fx(n, dt, xcl, azi+dt*v_rot, pol, gra2, fto2, planet, r, p, u, v, w);
     }
     else if (axis==1)
     {
       get_fy(n, 0.0, rad, azi, pol, gra1, fto1, planet, r, p, u, v, w);
-      get_fy(n,  dt, rad, xcl+dt*v_rot, pol, gra2, fto2, planet, r, p, u, v, w);
+      get_fy(n, dt, rad, xcl+dt*v_rot, pol, gra2, fto2, planet, r, p, u, v, w);
     }
     else
     {
       get_fz(n, 0.0, rad, azi, pol, gra1, fto1, planet, r, p, u, v, w);
       get_fz(n,  dt, rad, azi+dt*v_rot, xcl, gra2, fto2, planet, r, p, u, v, w);
-/*
-      if (nudr==0)
-      {
-        if (n<6) {gra1 *= -1.0; fto1 *= -1.0; gra2 *= -1.0; fto2 *= -1.0;}
-      }
-      if (ntop==0)
-      {
-      //if (n>=arrsize-6) {gra1 *= -1.0; fto1 *= -1.0; gra2 *= -1.0; fto2 *= -1.0;}
-      }
-*/
     }
   }
   __syncthreads();

@@ -367,21 +367,24 @@ __global__ void viscosity_all(smcell *cells, sdp dt, sdp alpha)
 */
 //================================================================================
 
-__device__ void device_viscosity_r(int i, sdp dt, sdp R, smcell *cells, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n, sdp alpha)
+__device__ void device_viscosity_r(int i, int lim, sdp dt, sdp R, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n)
 {
   sdp rho, nr, d1, d2, dn;
   sdp ddu, ddv, ddw;
 
-  rho = cell_r[i];
-  nr = vis_nu*rho;
-  //nr = get_cs2_device(R)*cpow(R,1.5)*rho;
-  //nr *= alpha;
+  if (i>=0 && i<lim)
+  {
+    rho = cell_r[i];
+    nr = get_nu(R)*rho;
+    //nr = get_cs2_device(R)*cpow(R,1.5)*rho;
+    //nr *= alpha;
 
-  n[i] = nr;
-  v[i] /= R*R;
+    n[i] = nr;
+    v[i] /= R*R;
+  }
   __syncthreads();
 
-  if (i>0 && i<arrsize-1)
+  if (i>=n_pad && i<lim-n_pad)
   {
     derivs(dn, d2, i, x, n);
 
@@ -403,7 +406,7 @@ __device__ void device_viscosity_r(int i, sdp dt, sdp R, smcell *cells, sdp *x, 
   }
   __syncthreads();
 
-  if (i>0 && i<arrsize-1)
+  if (i>=n_pad && i<lim-n_pad)
   {
     u[i] = ddu;
     #if ndim > 1
@@ -417,20 +420,23 @@ __device__ void device_viscosity_r(int i, sdp dt, sdp R, smcell *cells, sdp *x, 
   return;
 }
 
-__device__ void device_viscosity_p(int j, sdp dt, sdp R, smcell *cells, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n, sdp alpha)
+__device__ void device_viscosity_p(int j, int lim, sdp dt, sdp R, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n)
 {
   sdp rho, nr, d1, d2, dn;
   sdp ddu, ddv, ddw;
 
-  rho = cell_r[j];
-  nr = vis_nu*rho;
+  if (j>=0 && j<lim)
+  {
+    rho = cell_r[j];
+    nr = get_nu(R)*rho;
   //nr  = get_cs2_device(R)*cpow(R,1.5)*rho;
   //nr *= alpha;
 
-  n[j] = nr;
+    n[j] = nr;
+  }
   __syncthreads();
 
-  if (j>0 && j<arrsize-1)
+  if (j>=n_pad && j<lim-n_pad)
   {
     derivs(dn, d2, j, x, n);
 
@@ -453,7 +459,7 @@ __device__ void device_viscosity_p(int j, sdp dt, sdp R, smcell *cells, sdp *x, 
   }
   __syncthreads();
 
-  if (j>0 && j<arrsize-1)
+  if (j>=n_pad && j<lim-n_pad)
   {
     v[j] = ddv;
     #if ndim == 3
@@ -465,7 +471,7 @@ __device__ void device_viscosity_p(int j, sdp dt, sdp R, smcell *cells, sdp *x, 
   return;
 }
 
-__device__ void device_viscosity_z(int k, sdp dt, sdp R, smcell *cells, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n, sdp alpha)
+__device__ void device_viscosity_z(int k, sdp dt, sdp R, sdp *x, sdp *cell_r, sdp *u, sdp *v, sdp *w, sdp *n)
 {
   sdp nr, d1, d2, dn;
   sdp ddu, ddv, ddw;

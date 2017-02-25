@@ -9,7 +9,7 @@
 #include "cuSafe.cu"
 
 //#include "opacity.cu"
-//#include "viscosity.cu"
+#include "viscosity.cu"
 //#include "kill_wave.cu"
 //#include "boundary.cu"
 
@@ -23,7 +23,7 @@
 #include "ppmlr.cu"
 
 //================================================================================
-__global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt, int iblk, body planet)
+__global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt, int iblk, body planet, sdp FrRot)
 {
   int i, j0, j, lim;
   int i_ring, k_ring, loop;
@@ -33,8 +33,7 @@ __global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt,
   k_ring = blockIdx.y;
   loop = (iblk/realarr) + (bool)(iblk%realarr);
 
-
-  __shared__ sdp r_lt[n_pad], p_lt[n_pad], u_lt[n_pad], v_lt[n_pad], w_lt[n_pad];
+  sdp r_lt, p_lt, u_lt, v_lt, w_lt;
 
   __shared__ sdp r[arrsize], p[arrsize], u[arrsize], v[arrsize], w[arrsize], e[arrsize];
   __shared__ sdp xa0[arrsize], dx0[arrsize];
@@ -88,11 +87,11 @@ __global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt,
 
       if (l>0 && i<n_pad)
       {
-        r[i] = r_lt[i];
-        p[i] = p_lt[i];
-        u[i] = u_lt[i];
-        v[i] = v_lt[i];
-        w[i] = w_lt[i];
+        r[i] = r_lt;
+        p[i] = p_lt;
+        u[i] = u_lt;
+        v[i] = v_lt;
+        w[i] = w_lt;
       }
       else
       {
@@ -109,28 +108,26 @@ __global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt,
       #endif
       __syncthreads();
 
-      if (i>=lim-2*n_pad && i<lim-n_pad)
+      if (l<loop-1 && i<n_pad)
       {
-        r_lt[i-lim+2*n_pad] = r[i];
-        p_lt[i-lim+2*n_pad] = p[i];
-        u_lt[i-lim+2*n_pad] = u[i];
-        v_lt[i-lim+2*n_pad] = v[i];
-        w_lt[i-lim+2*n_pad] = w[i];
+        r_lt = r[i+lim-2*n_pad];
+        p_lt = p[i+lim-2*n_pad];
+        u_lt = u[i+lim-2*n_pad];
+        v_lt = v[i+lim-2*n_pad];
+        w_lt = w[i+lim-2*n_pad];
       }
-      
       __syncthreads();
 
       //if (j==99)
         //printf("%i, (%i, %i, %i), (%f, %f, %f):  (%e, %e, %e, %e, %e)\n", lim, i_ring, j, k_ring, rad, azi, pol, r[i]*cpow(rad,p_alpha)-1.0, p[i]/r[i], u[i], v[i]*cpow(rad,-0.5), w[i]);
       ///////////////////////////////////////////////////////
 
-      ppmlr(rad, azi, pol, ((*cur).rot_v-(*cur).res_v)/rad_cyl,
-            r, p, u, v, w, e, 
-            xa0, dx0, dvol0, 
+      ppmlr(rad, azi, pol, (*cur).res_v/rad_cyl, FrRot,
+            r, p, u, v, w, e, xa0, dx0, dvol0, 
             lim, dt, 0, planet);
 
       #if visc_flag == 1
-      device_viscosity_r(i, dt, rad_cyl, cells, xa0, r, u, v, w, dx0, alpha);
+      device_viscosity_r(i, lim, dt, rad_cyl, xa0, r, u, v, w, dx0);
       #endif
       __syncthreads();
       ///////////////////////////////////////////////////////
@@ -162,18 +159,18 @@ __global__ void sweepx(hydr_ring *rings, hydr_ring *lft, hydr_ring *rgh, sdp dt,
   return;
 }
 
-__global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet)
+__global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet, sdp FrRot)
 {
   int i, j0, j, jref, lim;
   int n, loop;
 
   i = threadIdx.x;
-  n = blockIdx.x + iblk*blockIdx.y;  
+  n = blockIdx.x + iblk*blockIdx.y;
   loop = (jmax/realarr) + (bool)(jmax%realarr);
 
 
   __shared__ sdp r_rg[n_pad], p_rg[n_pad], u_rg[n_pad], v_rg[n_pad], w_rg[n_pad];
-  __shared__ sdp r_lt[n_pad], p_lt[n_pad], u_lt[n_pad], v_lt[n_pad], w_lt[n_pad];
+  sdp r_lt, p_lt, u_lt, v_lt, w_lt;
 
   __shared__ sdp r[arrsize], p[arrsize], u[arrsize], v[arrsize], w[arrsize], e[arrsize];
   __shared__ sdp xa0[arrsize], dx0[arrsize];
@@ -221,11 +218,11 @@ __global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet)
 
       if (l>0 && i<n_pad)
       {
-        r[i] = r_lt[i];
-        p[i] = p_lt[i];
-        u[i] = u_lt[i];
-        v[i] = v_lt[i];
-        w[i] = w_lt[i];
+        r[i] = r_lt;
+        p[i] = p_lt;
+        u[i] = u_lt;
+        v[i] = v_lt;
+        w[i] = w_lt;
       }
       else if (l==loop-1 && i>=lim-n_pad)
       {
@@ -257,13 +254,13 @@ __global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet)
         w_rg[i-n_pad] = w[i];
       }
 
-      if (l<loop-1 && i>=lim-2*n_pad && i<lim-n_pad)
+      if (l<loop-1 && i<n_pad)
       {
-        r_lt[i-lim+2*n_pad] = r[i];
-        p_lt[i-lim+2*n_pad] = p[i];
-        u_lt[i-lim+2*n_pad] = u[i];
-        v_lt[i-lim+2*n_pad] = v[i];
-        w_lt[i-lim+2*n_pad] = w[i];
+        r_lt = r[i+lim-2*n_pad];
+        p_lt = p[i+lim-2*n_pad];
+        u_lt = u[i+lim-2*n_pad];
+        v_lt = v[i+lim-2*n_pad];
+        w_lt = w[i+lim-2*n_pad];
       }
 
       __syncthreads();
@@ -271,14 +268,14 @@ __global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet)
         //printf("%i, (%i, %i, %i), (%f, %f, %f):  (%f, %f, %f, %f, %f)\n", l, (int)blockIdx.x, jref, (int)blockIdx.y, rad, azi, pol, r[i], p[i], u[i], v[i], w[i]);
       ///////////////////////////////////////////////////////
 
-      ppmlr(rad_cyl, azi, pol, ((*cur).rot_v-(*cur).res_v)/rad_cyl,
+      ppmlr(rad_cyl, azi, pol, (*cur).res_v/rad_cyl, FrRot,
             r, p, u, v, w, e, 
             xa0, dx0, dvol0,
             lim, dt, 1, planet);
 
       #if visc_flag == 1
-      xa0[j] *= rad_cyl;
-      device_viscosity_p(j, dt, rad_cyl, cells, xa0, r, w, u, v, dx0, alpha);
+      xa0[i] *= rad_cyl;
+      device_viscosity_p(i, lim, dt, rad_cyl, xa0, r, w, u, v, dx0);
       #endif
       __syncthreads();
       ///////////////////////////////////////////////////////
@@ -306,82 +303,23 @@ __global__ void sweepy(hydr_ring *rings, sdp dt, int iblk, body planet)
     __syncthreads();
   }
 
-  if (i==0)
-  {
-    j  = (*cur).rot_j;
-    j += (*cur).inc_j;
-    if (j<0) j += jmax;
-    if (j>=jmax) j -= jmax;
-    (*cur).rot_j  = j;
-    //if (blockIdx.x==0) printf("%i %i %f\n", j, (*cur).inc_j, (*cur).rot_v*cpow(rad,0.5));
-  }
-
   return;
 }
 
-#if ndim == 3
-__global__ void sweepz(smcell *cells, sdp dt, int jngr, sdp *beta, body planet, sdp alpha)
+__global__ void rotate_rings(hydr_ring *rings, int iblk)
 {
-  int i, j, k;
-  int N = blockIdx.x;
-  i = blockIdx.y+6;
-  j = blockIdx.z+6;
-  k = threadIdx.x;
+  int j;
+  int n = blockIdx.x + iblk*blockIdx.y;
 
-  __shared__ sdp r[arrsize], p[arrsize], u[arrsize], v[arrsize], w[arrsize], e[arrsize];
-  __shared__ sdp xa0[arrsize], dx0[arrsize];
-  sdp dvol0, rad, azi, pol, rad_cyl, bt;
+  j  = rings[n].rot_j;
+  j += rings[n].inc_j;
+  if (j<0) j += jmax;
+  if (j>=jmax) j -= jmax;
+  rings[n].rot_j  = j;
 
-  pol = cells[N].zc[k];
-  if (ngeomy>2) rad = cells[N].xc[i];
-  else          rad = 1.0;
-  rad_cyl = rad;
-  if (ngeomz == 5) rad_cyl *= csin(pol);
-  azi = cells[N].yc[j];
-
-  xa0[k] = cells[N].z[k];
-  dx0[k] = cells[N].dz[k];
-  dvol0  = cells[N].zvol[k];
-  if (ngeomz > 2) dvol0 *= rad;
-
-  r[k] = cells[N].r[i][j][k];
-  p[k] = cells[N].p[i][j][k];
-  u[k] = cells[N].w[i][j][k];
-  v[k] = cells[N].u[i][j][k];
-  if (ngeomz == 5) w[k] = cells[N].v[i][j][k]*rad_cyl;
-  else             w[k] = cells[N].v[i][j][k];
-
-  #if EOS == 2
-  e  [k] = p[k]/(r[k]*gamm) + 0.5*(u[k]*u[k]) + potential(rad, azi, pol, planet);
-  #endif
-
-  __syncthreads();
-
-  ppmlr(dt, 2, rad, azi, pol, bt, planet,
-        r, p, u, v, w, e, xa0, dx0, dvol0);
-
-  #if visc_flag == 1
-  xa0[k] = cells[N].zc[k];
-  if (ngeomz == 5) xa0[k] = rad*ccos(xa0[k]);
-  device_viscosity_z(k, dt, rad_cyl, cells, xa0, r, v, w, u, dx0, alpha);
-  #endif
-
-  cells[N].r[i][j][k] = r[k];
-  #if EOS == 0
-  cells[N].p[i][j][k] = r[k]*get_cs2(rad_cyl);
-  #elif EOS == 1
-  cells[N].p[i][j][k] = get_cs2(rad_cyl)*cpow(r[k],gam)/gam;
-  #else
-  cells[N].p[i][j][k] = p[k];
-  #endif
-  cells[N].w[i][j][k] = u[k];
-  cells[N].u[i][j][k] = v[k];
-  if (ngeomz == 5) cells[N].v[i][j][k] = w[k]/rad_cyl;
-  else             cells[N].v[i][j][k] = w[k];
-
+  //if (blockIdx.x==0) printf("%i %i %f\n", j, (*cur).inc_j, (*cur).rot_v*cpow(rad,0.5));
   return;
 }
-#endif
 
 //=========================================================================================
 
@@ -417,7 +355,7 @@ void bound_trans(GPU_plan *set)
 }
 
 //=========================================================================================
-void bundle_sweep2D(GPU_plan *set, sdp dt, body &planet)
+void bundle_sweep2D(GPU_plan *set, sdp dt, body &planet, sdp FrRot)
 {
   bound_trans(set);
 
@@ -426,60 +364,15 @@ void bundle_sweep2D(GPU_plan *set, sdp dt, body &planet)
     CudaSafeCall( cudaSetDevice(set[n].id) );
 
     sweepx<<< set[n].sx_grid , arrsize , 0 , set[n].stream >>>
-          (set[n].rings, set[n].lft, set[n].rgh, dt, set[n].iblk, planet);
+          (set[n].rings, set[n].lft, set[n].rgh, dt, set[n].iblk, planet, FrRot);
     CudaCheckError();
 
     sweepy<<< set[n].sy_grid , arrsize , 0 , set[n].stream >>>
-          (set[n].rings, dt, set[n].iblk, planet);
-
-    CudaCheckError();
-  }
-
-  for (int i=0; i<nDev; i++)
-  {
-    CudaSafeCall( cudaStreamSynchronize(set[i].stream) );
-  }
-
-  return;
-}
-
-//=========================================================================================
-#if ndim == 3
-
-void bundle_sweep3D(GPU_plan *set, sdp dt, body &planet, sdp alpha)
-{
-  bound_trans(set);
-
-  for(int n=0; n<nDev; n++)
-  {
-    CudaSafeCall( cudaSetDevice(set[n].id) );
-
-    set_boundy<<< set[n].b_grid , set[n].b_blk , 0 , set[n].stream >>>
-              (set[n].cells, set[n].bac, set[n].frn, set[n].jstart, set[n].jend, set[n].iblk);
+          (set[n].rings, dt, set[n].iblk, planet, FrRot);
     CudaCheckError();
 
-    sweepy<<< set[n].s_grid , set[n].s_blk , 0 , set[n].stream >>>
-          (set[n].cells, dt, set[n].jblk*jdim, set[n].beta, planet, alpha);
-    CudaCheckError();
-
-    set_boundx<<< set[n].b_grid , set[n].b_blk , 0 , set[n].stream  >>>
-              (set[n].cells, set[n].lft, set[n].rgh, set[n].istart, set[n].iend, 1, alpha);
-    CudaCheckError();
-
-    sweepx<<< set[n].s_grid , set[n].s_blk , 0 , set[n].stream >>>
-          (set[n].cells, dt, set[n].jblk*jdim, set[n].beta, planet, alpha);
-    CudaCheckError();
-
-    set_boundz<<< set[n].b_grid , set[n].b_blk , 0 , set[n].stream >>>
-              (set[n].cells, set[n].udr, set[n].top, set[n].kstart, set[n].kend, set[n].iblk*set[n].jblk);
-    CudaCheckError();
-
-    sweepz<<< set[n].s_grid , set[n].s_blk , 0 , set[n].stream >>>
-          (set[n].cells, dt, set[n].jblk*jdim, set[n].beta, planet, alpha);
-    CudaCheckError();
-
-    #if kill_flag == 1
-    kill_wave<<< set[n].s_grid , idim , 0 , set[n].stream >>>(set[n].cells, set[n].val, dt, xmin, xmax);
+    #if FARGO_flag>0
+    rotate_rings<<< set[n].sy_grid , 1 , 0 , set[n].stream >>> (set[n].rings, set[n].iblk);
     CudaCheckError();
     #endif
   }
@@ -488,7 +381,6 @@ void bundle_sweep3D(GPU_plan *set, sdp dt, body &planet, sdp alpha)
   {
     CudaSafeCall( cudaStreamSynchronize(set[i].stream) );
   }
+
   return;
 }
-
-#endif

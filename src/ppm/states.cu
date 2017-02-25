@@ -27,21 +27,7 @@ __device__ void states( int &n, int nmax, sdp hdt, int &axis,
     else if (axis==1)
       get_fy      (n, hdt, rad, xa0[n]+hdt*v_rot, pol, tmp, ftot, planet, r, p, u, v, w);
     else
-    {
       get_fz_bound(n, hdt, rad, azi+hdt*v_rot, xa0[n], tmp, ftot, planet, r, p, u, v, w);
-/*
-      if (nudr==0)
-      {
-        if (n<5) {ftot *= -1.0;}
-        if (n==5) {ftot *= 0.0;}
-      }
-      if (ntop==0)
-      {
-      //if (n>arrsize-6) {ftot *= -1.0;}
-      //if (n==arrsize-6) {ftot *= 0.0;}
-      }
-*/
-    }
   }
   __syncthreads();
 

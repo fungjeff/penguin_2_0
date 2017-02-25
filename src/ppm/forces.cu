@@ -3,7 +3,7 @@
 
 __device__ sdp potential(sdp &rad, sdp &azi, sdp &z, body &p)
 {
-  #if plnt_flag==1
+  #if plnt_flag > 0
   sdp cosfac = ccos(azi-p.y);
   sdp stm = 1.0/(1.0+p.m);
   sdp plm = p.m*stm;
@@ -11,7 +11,7 @@ __device__ sdp potential(sdp &rad, sdp &azi, sdp &z, body &p)
   sdp stx = p.x*plm;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac + z*z);
   return -plm/Rp - stm/Rs;
@@ -32,7 +32,7 @@ __device__ sdp star_planet_grav_rad(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp stx = p.x*plm;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac*sinpol);
 
@@ -43,7 +43,7 @@ __device__ sdp star_planet_grav_rad(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp plx = p.x;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   return -plm*(rad-plx*cosfac*sinpol)/(Rp*Rp*Rp) - stm/(rad*rad) - plm*sinpol*cosfac/(plx*plx);
   #endif
@@ -63,7 +63,7 @@ __device__ sdp star_planet_grav_azi(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp stx = p.x*plm;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac*sinpol);
 
@@ -74,7 +74,7 @@ __device__ sdp star_planet_grav_azi(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp plx = p.x;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   return -plm*plx*sinfac/(Rp*Rp*Rp) + plm*sinpol*sinfac/plx/plx;
   #endif
@@ -92,7 +92,7 @@ __device__ sdp star_planet_grav_pol(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp stx = p.x*plm;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac*sinpol);
 
@@ -103,7 +103,7 @@ __device__ sdp star_planet_grav_pol(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
   sdp plx = p.x;
 
   sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac*sinpol;
-  Rp = csqrt(Rp+epsilon);
+  Rp = csqrt(Rp + p.rs*p.rs);
 
   return plm*plx*cosfac*cospol/(Rp*Rp*Rp) - plm*cosfac*cospol/(sinpol*plx*plx);
   #endif
@@ -112,65 +112,73 @@ __device__ sdp star_planet_grav_pol(sdp rad, sdp &azi, sdp pol, body &p, sdp dt)
 __device__ sdp star_planet_grav_rad_cyl(sdp rad, sdp azi, sdp z, body &p, sdp dt)
 {
   sdp cosfac = ccos(azi-(p.y+dt*p.vy));
+
+  #ifdef bary_flag
   sdp stm = 1.0/(1.0+p.m);
   sdp plm = p.m*stm;
   sdp plx = p.x*stm;
   sdp stx = p.x*plm;
 
-  sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z;
-  Rp = csqrt(Rp+epsilon);
-
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac + z*z);
+
   return -plm*(rad-plx*cosfac)/(Rp*Rp*Rp) - stm*(rad+stx*cosfac)/(Rs*Rs*Rs);
+  #else
+  sdp plm = p.m;
+  sdp plx = p.x;
+
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
+
+  return -plm*(rad-plx*cosfac)/(Rp*Rp*Rp) - plm*cosfac/(plx*plx);
+  #endif
 }
 
 __device__ sdp star_planet_grav_azi_cyl(sdp rad, sdp azi, sdp z, body &p, sdp dt)
 {
-  sdp cosfac;
-  sdp sinfac;
-  sincos(azi-(p.y+dt*p.vy), &sinfac, &cosfac);
+  sdp cosfac = ccos(azi-(p.y+dt*p.vy));
+  sdp sinfac = csin(azi-(p.y+dt*p.vy));
+
+  #ifdef bary_flag
   sdp stm = 1.0/(1.0+p.m);
   sdp plm = p.m*stm;
   sdp plx = p.x*stm;
   sdp stx = p.x*plm;
 
-  sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z;
-  Rp = csqrt(Rp+epsilon);
-
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac + z*z);
+
   return -plm*plx*sinfac/(Rp*Rp*Rp) + stm*stx*sinfac/(Rs*Rs*Rs);
-}
+  #else
+  sdp plm = p.m;
+  sdp plx = p.x;
 
-__device__ sdp planet_grav_azi_cyl(sdp rad, sdp azi, sdp z, body &p, sdp dt)
-{
-  sdp cosfac;
-  sdp sinfac;
-  sincos(azi-(p.y+dt*p.vy), &sinfac, &cosfac);
-  sdp stm = 1.0/(1.0+p.m);
-  sdp plm = p.m*stm;
-  sdp plx = p.x*stm;
-  sdp stx = p.x*plm;
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
 
-  sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z;
-  Rp = csqrt(Rp+epsilon);
-
-  sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac + z*z);
-  return -plm*plx*sinfac/(Rp*Rp*Rp);
+  return -plm*plx*sinfac/(Rp*Rp*Rp) + plm*sinfac/plx/plx;
+  #endif
 }
 
 __device__ sdp star_planet_grav_pol_cyl(sdp rad, sdp azi, sdp z, body &p, sdp dt)
 {
   sdp cosfac = ccos(azi-(p.y+dt*p.vy));
+
+  #ifdef bary_flag
   sdp stm = 1.0/(1.0+p.m);
   sdp plm = p.m*stm;
   sdp plx = p.x*stm;
   sdp stx = p.x*plm;
 
-  sdp Rp = rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z;
-  Rp = csqrt(Rp+epsilon);
-
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
   sdp Rs = csqrt(rad*rad + stx*stx + 2.0*stx*rad*cosfac + z*z);
   return -plm*z/(Rp*Rp*Rp) - stm*z/(Rs*Rs*Rs);
+  #else
+  sdp plm = p.m;
+  sdp plx = p.x;
+
+  sdp Rp = csqrt(rad*rad + plx*plx - 2.0*plx*rad*cosfac + z*z + p.rs*p.rs);
+
+  return -plm*z/(Rp*Rp*Rp);
+  #endif
 }
 
 //=======================================================================
@@ -186,8 +194,11 @@ __device__ void get_fx_bound(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
     
   else if (ngeomx==1)   // CYLINDRICAL R
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_rad_cyl(rad, azi, pol, planet, dt);
+    #ifndef bary_flag
+    grav+= -1.0/rad/rad;
+    #endif
     #else
     sdp dis = csqrt(rad*rad+pol*pol);
     grav = -rad/dis/dis/dis;
@@ -199,7 +210,7 @@ __device__ void get_fx_bound(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   }  
   else if (ngeomx==2)  // SPHERICAL R
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_rad(rad, azi, pol, planet, dt);
     #else
     grav = -1.0/rad/rad;
@@ -223,8 +234,11 @@ __device__ void get_fx(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   }
   else if (ngeomx==1)   // CYLINDRICAL R
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_rad_cyl(rad, azi, pol, planet, dt);
+    #ifndef bary_flag
+    grav+= -1.0/rad/rad;
+    #endif
     #else
     sdp dis = csqrt(rad*rad+pol*pol);
     grav = -rad/dis/dis/dis;
@@ -235,7 +249,7 @@ __device__ void get_fx(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   } 
   else if (ngeomx==2)  // SPHERICAL R
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_rad(rad, azi, pol, planet, dt);
     #else
     grav = -1.0/rad/rad;
@@ -259,7 +273,7 @@ __device__ void get_fy(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   }
   else if (ngeomy==3)  // CYLINDRICAL PHI
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_azi_cyl(rad, azi, pol, planet, dt);
     #else
     grav = 0.0;
@@ -269,7 +283,7 @@ __device__ void get_fy(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   } 
   else if (ngeomy==4)  // SPHERICAL PHI
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_azi(rad, azi, pol, planet, dt);
     #else
     grav = 0.0;
@@ -287,7 +301,7 @@ __device__ void get_fz_bound(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
 {
   if (ngeomz==0)  // CARTESIAN OR CYLINDRICAL
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_pol_cyl(rad, azi, pol, planet, dt);
     #else
     sdp dis = csqrt(rad*rad+pol*pol);
@@ -302,7 +316,7 @@ __device__ void get_fz_bound(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   }
   else if (ngeomz==5)  // SPHERICAL THETA
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_pol(rad, azi, pol, planet, dt);
     #else
     grav = 0.0;
@@ -325,7 +339,7 @@ __device__ void get_fz(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
 {
   if (ngeomz==0)  // CARTESIAN OR CYLINDRICAL
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_pol_cyl(rad, azi, pol, planet, dt);
     #else
     sdp dis = csqrt(rad*rad+pol*pol);
@@ -340,7 +354,7 @@ __device__ void get_fz(int &n, sdp dt, sdp rad, sdp azi, sdp pol,
   }
   else if (ngeomz==5)  // SPHERICAL THETA
   {
-    #if plnt_flag==1
+    #if plnt_flag > 0
     grav = star_planet_grav_pol(rad, azi, pol, planet, dt);
     #else
     grav = 0.0;
