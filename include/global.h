@@ -15,35 +15,35 @@ const sdp smallr = 1.0e-15;
 
 #define flat_flag                // defined = ppm flattening at shocks
 //#define bary_flag              // defined = barycentric frame
-#define EOS 0                    // 0:isothermal 1:isentropic 2:energy(adiabatic; untested)
+#define EOS 0                    // 0:isothermal 1:isentropic 2:energy(adiabatic; still buggy)
 
 #define plnt_flag 2              // 0:no planet 1:fixed planet 2:moving planet
 #define FrRot_flag 1             // 0:no frame roation 1:rotate with planet
-#define kill_flag 0              // 0:no killing zone 1:yes killing zone (not implemented yet)
+#define kill_flag 0              // 0:no killing zone 1:yes killing zone (not implemented)
 #define visc_flag 1              // 0:no viscosity 1:yes viscosity
 #define FARGO_flag 1             // 0:no orbital advection 1:yes orbital advection
 
-#define dump_flag 1              // 0:no grid output 1:yes grid output
+#define dump_flag 1              // 0:no data output 1:yes data output
 
 //=======================================================================
 // Disk parameters
 //=======================================================================
 
-const sdp p_alpha = 1.5;               // surface density ~ r^-p_alpha
-const sdp p_beta = 0.5;                // temperature ~ r^-p_beta
-const sdp ss_alpha = 0.0001;           // alpha-viscosity
-const sdp sc_h = 0.05;                 // scale height at r=1
+const sdp p_alpha = 1.5;            // surface density ~ r^-p_alpha
+const sdp p_beta = 0.5;             // temperature ~ r^-p_beta
+const sdp ss_alpha = 0.0001;          // alpha-viscosity
+const sdp sc_h = 0.05;              // scale height at r=1
 const sdp vis_nu = ss_alpha*sc_h*sc_h;          // kinematic viscosity
-const sdp Sigma_0 = 1.0*MMSN_1AU;      // density at r=1 in units of M_solar/AU^2
+const sdp Sigma_0 = 1.0*MMSN_1AU;   // density at r=1 in units of M_solar/AU^2
 
 //=======================================================================
 // Planet parameters
 //=======================================================================
 
-const sdp M_p = 1.0*JupiterMass;       // planet mass
-const sdp R_p = 1.0;                   // radial distance
+const sdp M_p = 1.0*JupiterMass;    // planet mass
+const sdp R_p = 1.0;                // radial distance
 const sdp t_growth = 1000.0*twopi;     // time to grow planet from 0 to M_p
-const sdp rs_fac = 0.5;                // smoothing length = rs_fac * scale height
+const sdp rs_fac = 0.5;             // smoothing length = rs_fac * scale height
 
 //=======================================================================
 // Hydro parameters
@@ -63,7 +63,7 @@ const int nfrn = 2;
 const int nudr = 3;
 const int ntop = 3;
 
-const sdp endtime = 10000.0*twopi;       // total simulation time
+const sdp endtime = 10000.0*twopi;        // total simulation time
 const sdp tmovie = 200.0*twopi;          // time interval for dumping data if dump_flag=1
 
 const int ncycend = 1000000000;        // maximum number of time step

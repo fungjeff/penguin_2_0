@@ -29,6 +29,6 @@ void write_para_file(ofstream&, string&, string&);
 
 void write_initial_file(ofstream&, sdp*, sdp*);
 
-sdp GPU_output_reduction(GPU_plan*, body, sdp, int mode = 0);
+sdp GPU_output_reduction(GPU_plan*, body, sdp, int mode=0);
 
 #endif

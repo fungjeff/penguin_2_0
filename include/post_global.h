@@ -18,8 +18,8 @@ const int n_pad = 6;     //number of boundary zones on each side: 6 for ppm
 const int arrsize = 96;  //for optimal speed: arrsize = 32*(integer)
 const int realarr = arrsize - 2*n_pad;
 
-const int imax = 800;    //for optimal speed: imax = realarr*(integer)
-const int jmax = 3200;    //                  same for jmax and kmax
+const int imax = 850;    //for optimal speed: imax = realarr*(integer)
+const int jmax = 2000;    //                  same for jmax and kmax
 const int kmax = 1;
 
 //=======================================================================
@@ -43,7 +43,7 @@ const sdp smallr = 1.0e-15;
 
 const sdp M_p = 5.0*EarthMass;
 const sdp R_p = 1.0;
-const sdp epsilon = 0.5*sc_h*R_p * 0.5*sc_h*R_p;
+const sdp epsilon = 0.0;
 
 //=======================================================================
 // Grid parameters

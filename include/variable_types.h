@@ -10,13 +10,13 @@ typedef double2 sdp2;
 
 #define ndim 2
 
-const int n_pad = 6;     //number of boundary zones on each side: 6 for ppm
+const int n_pad = 6;                      //number of boundary zones on each side: 6 for ppm
 
-const int arrsize = 128;  //for optimal speed: arrsize = 32*(integer)
+const int arrsize = 128;                  //for optimal speed: arrsize = 32*(integer)
 const int realarr = arrsize - 2*n_pad;
 
-const int imax = 800;    //for optimal speed: imax = realarr*(integer)
-const int jmax = 3200;    //                  same for jmax and kmax
+const int imax = 850;                     //for optimal speed: imax = realarr*(integer)
+const int jmax = 2000;                    //same for jmax and kmax
 const int kmax = 1;
 
 //=======================================================================
@@ -31,6 +31,9 @@ struct body
   //sdp z;
   sdp vx;
   sdp vy;
+  sdp fx;
+  sdp fy;
+  sdp rs;
 };
 
 struct ParaConst

@@ -8,10 +8,13 @@
 sdp get_rho(sdp);
 
 __host__ __device__ sdp get_cs2(sdp);
+__host__ __device__ sdp get_h(sdp);
 
 sdp get_P(sdp);
 
 sdp get_dP_dr(sdp);
+
+__host__ __device__ sdp get_nu(sdp);
 
 sdp get_viscous_vr(sdp);
 
