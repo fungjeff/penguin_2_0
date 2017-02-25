@@ -13,7 +13,7 @@
 #include "output.h"
 #include "timestep.h"
 #include "planet.h"
-#include "FARGO.h"
+#include "orbital_advection.h"
 #include "cuSafe.cu"
 
 using namespace std;
