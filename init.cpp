@@ -209,77 +209,13 @@ void init_cells_val(hydr_ring &ring, int i, int k, SymDisk *val)
     ring.u[j] = val[idx].u;
     ring.v[j] = val[idx].v;
     ring.w[j] = 0.0;
-  } 
+  }
 
-  ring.rot_v = val[idx].v - FrRot*ring.xc;
   ring.rot_j = 0;
 
-  //if (i==100) {
-  //printf(" (%i, %f), (%i, %f) = %f\n", i, ring.xc, k, ring.zc, ring.r[0]);
-  //wait_f_r();
-  //}
-
   return;
 }
 
-//#########################################################################################
-/*
-
-void init_cells_bound(hydr_ring &ring, int i, int k)
-{
-  /////////////////////z-direction////////////////////////
-
-  ring.k = k;
-  if (k<0)
-  {
-    ring.z  = zza[0]+zdz[0]*(double)i;
-    ring.dz = zdz[0];
-  }
-  else if (k>=kmax)
-  {
-    ring.z  = zza[kmax-1]+zdz[kmax-1]*(double)(k-kmax+1);
-    ring.dz = zdz[kmax-1];
-  }
-  else
-  {
-    ring.z  = zza[i];
-    ring.dz = zdz[i];
-  }
-  ring.zc = ring.z + 0.5*ring.dz;
-
-  /////////////////////x-direction////////////////////////
-
-  ring.i = i;
-  if (i<0)
-  {
-    ring.x  = zxa[0]+zdx[0]*(double)i;
-    ring.dx = zdx[0];
-  }
-  else if (i>=imax)
-  {
-    ring.x  = zxa[imax-1]+zdx[imax-1]*(double)(i-imax+1);
-    ring.dx = zdx[imax-1];
-  }
-  else
-  {
-    ring.x  = zxa[i];
-    ring.dx = zdx[i];
-  }
-  ring.xc = ring.x + 0.5*ring.dx;
-
-  /////////////////////y-direction////////////////////////
-
-  for (int j=0; j<jmax; j++)
-  {
-    ring.y[j]  = zya[j];
-    ring.dy[j] = zdy[j];
-    ring.yc[j] = ring.y[j] + 0.5*ring.dy[j];
-  } 
-
-  return;
-}
-
-*/
 //#########################################################################################
 
 void init_cells_vol(hydr_ring &ring)
@@ -341,10 +277,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
 
         if (ndim == 2)
         {
-          rho = get_rho(rr);
-          P = get_P(rr);
-          dP = get_dP_dr(rr);
-          vk  = 1.0/rr;
+          r = rr;
+          z = 0.0;
+
+          rho = get_rho(r);
+          P = get_P(r);
+          dP = get_dP_dr(r);
+          vk  = 1.0/r;
         }
         else if (ngeomz==5)
         {
@@ -367,7 +306,11 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
         {
           lft[ib].r[j] = rho;
           lft[ib].p[j] = P;
+          #if ndim==3
           lft[ib].u[j] = get_viscous_vr(r, z);
+          #else
+          lft[ib].u[j] = get_viscous_vr(r);
+          #endif
           lft[ib].v[j] = vk;
           lft[ib].w[j] = 0.0;
           lft[ib].y[j] = zya[j];
@@ -376,7 +319,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
           lft[ib].yvol[j] = get_vol( zya[j] , zdy[j] , 1 );
         }
 
-        lft[ib].rot_v = vk;
+        #if FARGO_flag == 1
+        lft[ib].rot_v = vk - 1.0*lft[ib].xc;
+        #elif FARGO_flag == 2
+        lft[ib].rot_v = (1.0 - 1.0)*lft[ib].xc;
+        #else
+        lft[ib].rot_v = 0.0;
+        #endif
         lft[ib].rot_j = 0;
       }
     }
@@ -403,10 +352,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
 
         if (ndim == 2)
         {
-          rho = get_rho(rr);
-          P = get_P(rr);
-          dP = get_dP_dr(rr);
-          vk  = 1.0/rr;
+          r = rr;
+          z = 0.0;
+
+          rho = get_rho(r);
+          P = get_P(r);
+          dP = get_dP_dr(r);
+          vk  = 1.0/r;
         }
         else if (ngeomz==5)
         {
@@ -435,7 +387,11 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
         {
           rgh[ib].r[j] = rho;
           rgh[ib].p[j] = P;
+          #if ndim == 3
           rgh[ib].u[j] = get_viscous_vr(r, z);
+          #else
+          rgh[ib].u[j] = get_viscous_vr(r);
+          #endif
           rgh[ib].v[j] = vk;
           rgh[ib].w[j] = 0.0;
           rgh[ib].y[j] = zya[j];
@@ -444,7 +400,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
           rgh[ib].yvol[j] = get_vol( zya[j] , zdy[j] , 1 );
         }
 
-        rgh[ib].rot_v = vk;
+        #if FARGO_flag == 1
+        rgh[ib].rot_v = vk - 1.0*rgh[ib].xc;
+        #elif FARGO_flag == 2
+        rgh[ib].rot_v = (1.0 - 1.0)*rgh[ib].xc;
+        #else
+        rgh[ib].rot_v = 0.0;
+        #endif
         rgh[ib].rot_j = 0;
       }
     }
@@ -501,7 +463,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
           udr[ib].yvol[j] = get_vol( zya[j] , zdy[j] , 1 );
         }
 
-        udr[ib].rot_v = vk;
+        #if FARGO_flag == 1
+        udr[ib].rot_v = vk - 1.0*udr[ib].xc;
+        #elif FARGO_flag == 2
+        udr[ib].rot_v = (1.0 - 1.0)*udr[ib].xc;
+        #else
+        udr[ib].rot_v = 0.0;
+        #endif
         udr[ib].rot_j = 0;
       }
     }
@@ -558,7 +526,13 @@ void init_bound(hydr_ring *lft, hydr_ring *rgh, hydr_ring *udr, hydr_ring *top)
           top[ib].yvol[j] = get_vol( zya[j] , zdy[j] , 1 );
         }
 
-        top[ib].rot_v = vk;
+        #if FARGO_flag == 1
+        top[ib].rot_v = vk - 1.0*top[ib].xc;
+        #elif FARGO_flag == 2
+        top[ib].rot_v = (1.0 - 1.0)*top[ib].xc;
+        #else
+        top[ib].rot_v = 0.0;
+        #endif
         top[ib].rot_j = 0;
       }
     } 

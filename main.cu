@@ -12,7 +12,8 @@
 #include "ppm.h"
 #include "output.h"
 #include "timestep.h"
-#include "orbital_advection.h"
+#include "planet.h"
+#include "FARGO.h"
 #include "cuSafe.cu"
 
 using namespace std;
@@ -122,12 +123,6 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
   pfname  = mainp+"/read/para_"+label+".dat";
   bfname  = mainp+"/binary/binary_"+label+"_";
 
-  #if file_flag == 1
-  ofstream result_file;
-  string result_fname;
-  result_fname  = mainp+"/files/result_"+label;
-  #endif
-
   if (ndim==1 && jmax*kmax!=1){
     cout << "Requesting 1D problem but arrays are dimensioned for 2/3D" << endl;
     return;
@@ -210,25 +205,6 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
     CudaSafeCall( cudaMalloc( (void**)&set[n].cp_rgh, n_pad*kmax*sizeof(hydr_ring) ) );
     printf(" done\n");
 
-    #if file_flag==1
-    CudaSafeCall( cudaMalloc( (void**)&set[n].d_output1, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-    CudaSafeCall( cudaMallocHost( (void**)&set[n].h_output1, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-
-    CudaSafeCall( cudaMalloc( (void**)&set[n].d_output2, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-    CudaSafeCall( cudaMallocHost( (void**)&set[n].h_output2, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-
-    CudaSafeCall( cudaMalloc( (void**)&set[n].d_output3, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-    CudaSafeCall( cudaMallocHost( (void**)&set[n].h_output3, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-
-    CudaSafeCall( cudaMalloc( (void**)&set[n].d_output4, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-    CudaSafeCall( cudaMallocHost( (void**)&set[n].h_output4, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-
-    CudaSafeCall( cudaMalloc( (void**)&set[n].d_output5, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-    CudaSafeCall( cudaMallocHost( (void**)&set[n].h_output5, sizeof(sdp)*jmax*set[n].iblk*set[n].kblk ) );
-
-    cout << "  Allocated " << 5*sizeof(sdp)*imax*jmax*kmax/1024/1024/nDev << "MB for output" << endl;
-    #endif
-
     CudaSafeCall( cudaMalloc( (void**)&set[n].val, imax*kmax*sizeof(SymDisk) ) );
 
     CudaSafeCall( cudaMalloc( (void**)&set[n].dt, sizeof(sdp) ) );
@@ -294,7 +270,6 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
   sdp dt = endtime;
 
   sdp simtime = tmovie*(double)startat;
-  sdp timep   = 0.0;
   sdp timem   = 0.0;
   int ncycle  = 0;
   int ncycp   = 0;
@@ -347,75 +322,13 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
   else        append_output_file(tfile, tfname);
   #endif
 
-  #if file_flag==1
-  open_binary_file(result_file, result_fname);
-  for (int n=0; n<nDev; n++)
-  {
-    CudaSafeCall( cudaSetDevice(set[n].id) );
-    clear_output<<< kmax , imax, 0 , set[n].stream >>>(set[n].d_output1, set[n].d_output2, set[n].d_output3, set[n].d_output4, set[n].d_output5);
-  }
-
-  result *a = new result;
-  (*a).q_ratio = M_p;
-  (*a).aspect_ratio = sc_h;
-  (*a).alpha = ss_alpha;
-  #endif
-
   body planet;
-  planet.m = M_p;
-  planet.x = R_p;
-  planet.y = pi;
-  planet.vx = 0.0;
-  planet.vy = pow(planet.x,-1.5)-FrRot;
+  sdp FrRot;
+  init_planet(planet, FrRot);
+  planet_forces(planet, FrRot, set, simtime);
 
-/*
-  //for (int i=0; i<n_pad; i++)   printf("%f : %.12f \n", lft[i+n_pad*0].xc, lft[i+n_pad*0].r[20] );
-  //for (int i=0; i<imax; i++)   printf("%f : %.12f \n", set[0].h_rings[i+imax*0].xc, set[0].h_rings[i+imax*0].r[20] );
-  //for (int i=0; i<n_pad; i++)   printf("%f : %.12f \n", rgh[i+n_pad*0].xc, rgh[i+n_pad*0].r[20] );
-  //wait_f_r();
-  
-  sdp tmp;
-  if (ndim == 3) tmp = (ymax-ymin) * (cos(zmin)-cos(zmax)) * third*(pow(xmax,3)-pow(xmin,3));
-  else           tmp = (ymax-ymin) * 0.5*(pow(xmax,2)-pow(xmin,2));
-  printf("True grid volume: %.12f \n", tmp );
+  if (!restart) Index_Shift(set, dt, FrRot);
 
-  tmp=0.0;
-  for (int i=0; i<imax; i++)
-  {
-    for (int k=0; k<kmax; k++)
-    {
-      for (int j=0; j<jmax; j++)
-      {
-        if (ndim == 3) tmp += (cos(zza[k])-cos(zza[k]+zdz[k])) * zdx[i]*(zxa[i]*(zxa[i] + zdx[i]) + zdx[i]*zdx[i]*third) * zdy[j];
-        else           tmp += set[0].h_rings[i].xvol * set[0].h_rings[i].yvol[j];//zdx[i]*(zxa[i] + zdx[i]*0.5) * zdy[j];
-      }
-    }
-  }
-  printf("CPU volume sum: %.12f \n", tmp );
-
-  tmp = GPU_output_reduction(set, planet, 0.0);
-  printf("GPU volume sum: %.12f \n", tmp );
-
-
-  dt = courant * (twopi/(sdp)jmax) / (sc_h/zxc[0] + pow(zxc[0],-1.5) - pow(0.75,-1.5));
-  printf("Analytic dt with/o FARGO: %.12f \n", dt );
-
-  dt=1.0;
-  for (int i=0; i<imax; i++)
-  {
-    for (int k=0; k<kmax; k++)
-    {
-      for (int j=0; j<jmax; j++)
-      {
-        if (ndim == 3) dt = min(dt, courant*zxc[i]*sin(zzc[k])*zdy[j]/(sc_h) );
-        else           dt = min(dt, courant*zxc[i]*zdy[j]/(sc_h) );
-        dt = min(dt, courant*zdx[i]/(sc_h + val[i+imax*k].u) );
-        if (ndim == 3) dt = min(dt, courant*zxc[i]*zdz[k]/(sc_h + val[i+imax*k].w) );
-      }
-    }
-  }
-  printf("CPU dt with FARGO: %.12f \n", dt );
-*/
 //============================================================================================
 //                         MAIN COMPUTATIONAL LOOP
 
@@ -429,9 +342,7 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
 
   while (cont_simu)
   {
-    dt = get_dt(dt, set);
-    Index_Shift(set, dt);
-    planet.m = set_M_p(simtime);
+    dt = get_dt(dt, set, FrRot);
    
     if ( ncycle == ncycend )
     {
@@ -454,27 +365,26 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
       make_pict = true;
     }
 
+    Index_Shift(set, dt, FrRot);
+    #if plnt_flag > 0
+    kick_drift_kick(planet, FrRot, set, simtime, 0.5*dt, true);
+    #endif
+
     #if ndim == 2
-    bundle_sweep2D(set, dt, planet);
+    bundle_sweep2D(set, dt, planet, FrRot);
     #elif ndim == 3
     bundle_sweep3D(set, dt, planet);
     #endif
-    planet.y += dt*(1.0-FrRot);
-    if (planet.y<0.0)    planet.y += twopi;
-    if (planet.y>=twopi) planet.y -= twopi;
-
-    #if file_flag==1
-    for (int n=0; n<nDev; n++) 
-    {
-      CudaSafeCall( cudaSetDevice(set[n].id) );
-      cal_output<<< set[n].s_grid , idim, 0 , set[n].stream >>>(set[n].cells, dt, set[n].d_output1, set[n].d_output2, set[n].d_output3, set[n].d_output4, set[n].d_output5);
-    }
-    #endif
-
     simtime += dt;
     timem   += dt;
     ncycle++;
     ncycp++;
+
+    #if plnt_flag > 0
+    kick_drift_kick(planet, FrRot, set, simtime, dt, false);
+    planet_forces(planet, FrRot, set, simtime);
+    kick_drift_kick(planet, FrRot, set, simtime, 0.5*dt, true);
+    #endif
 
     if ( ncycp == nprin )
     {
@@ -504,13 +414,24 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
     if (prin_info)
     {
       #if dump_flag==1
-      tfile << simtime << " " << GPU_output_reduction(set, planet, 0.0)*sc_h*sc_h/M_p/M_p << endl;
+      tfile << simtime << " ";
+      tfile << GPU_output_reduction(set, planet, 0.0);
+      #if plnt_flag>0
+      tfile << " ";
+      tfile << GPU_output_reduction(set, planet, 0.0, 9)/(M_p*M_p*pow(R_p, 1.0-p_alpha+(p_beta-1.0))/(sc_h*sc_h)) << " ";
+      tfile << planet.x << " " << planet.y << " ";
+      tfile << planet.vx << " " << planet.vy << " ";
+      tfile << planet.fx << " " << planet.fy << " ";
+      tfile << get_ecc(planet, FrRot) << " " << -1.0/(2.0*get_E(planet, FrRot));
+      #endif
+      tfile << endl;
       #endif
 
       elapse = clock()-begin;
       speed = (double)elapse/(double)CLOCKS_PER_SEC/(double)ncycle;
       cout << endl;
       cout << "# of steps = " << ncycle << " ( t/T = "<< simtime/endtime << ", dt = " << dt << " )" << endl;
+      cout << "p1 located at r = " << planet.x << " and phi = " << planet.y/twopi << endl;
       cout << "Average Speed is " << speed << " seconds per time step." << endl;
       cout << "Estimated time for completion: " << (speed*(double)ncycle)/60.0 << " of "
            << ((endtime-tmovie*(double)startat)*speed*(double)ncycle/(simtime-tmovie*(double)startat))/60.0 << " minutes." << endl;
@@ -518,70 +439,6 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
       prin_info = false;
     }
   }
-/*
-  for (int n=0; n<nDev; n++)
-  {
-    CudaSafeCall( cudaMemcpy( set[n].h_rings, set[n].rings, set[n].memsize, cudaMemcpyDeviceToHost ) );
-  }
-
-  for (int i=0; i<n_pad; i++)  printf("%f : %.12e \n", lft[i].xc, lft[i].r[20]*cpow(lft[i].xc,p_alpha)-1.0 );
-  for (int i=0; i<imax; i++)   printf("%f : %.12e \n", set[0].h_rings[i].xc, set[0].h_rings[i].r[20]*cpow(set[0].h_rings[i].xc,p_alpha)-1.0 );
-  for (int i=0; i<n_pad; i++)  printf("%f : %.12e \n", rgh[i].xc, rgh[i].r[20]*cpow(rgh[i].xc,p_alpha)-1.0 );
-  wait_f_r();
-*/
-  //P2P_all_disable(set);
-
-  #if file_flag == 1
-  for (int n=0; n<nDev; n++)
-  {
-    CudaSafeCall( cudaSetDevice(set[n].id) );
-    CudaSafeCall( cudaMemcpy( set[n].h_output1, set[n].d_output1, sizeof(sdp)*imax*jmax*kmax/nDev, cudaMemcpyDeviceToHost ) );
-    CudaSafeCall( cudaMemcpy( set[n].h_output2, set[n].d_output2, sizeof(sdp)*imax*jmax*kmax/nDev, cudaMemcpyDeviceToHost ) );
-    CudaSafeCall( cudaMemcpy( set[n].h_output3, set[n].d_output3, sizeof(sdp)*imax*jmax*kmax/nDev, cudaMemcpyDeviceToHost ) );
-    CudaSafeCall( cudaMemcpy( set[n].h_output4, set[n].d_output4, sizeof(sdp)*imax*jmax*kmax/nDev, cudaMemcpyDeviceToHost ) );
-    CudaSafeCall( cudaMemcpy( set[n].h_output5, set[n].d_output5, sizeof(sdp)*imax*jmax*kmax/nDev, cudaMemcpyDeviceToHost ) );
-  }
-
-  int n;
-  int ind;
-  (*a).start_t = tmovie*(double)startat;
-  (*a).end_t = simtime;
-
-  for (int i=0; i<imax; i++)
-  {
-    (*a).x[i]  = zxc[i];
-    (*a).dx[i] = zdx[i];
-  }
-
-  for (int j=0; j<jmax; j++)
-  {
-    (*a).y[j]  = zyc[j];
-    (*a).dy[j] = zdy[j];
-  }
-
-  for (int k=0; k<kmax; k++)
-  {
-    (*a).z[k]  = zzc[k];
-    (*a).dz[k] = zdz[k];
-  }
-
-  for (int i=0; i<imax; i++)
-    for (int j=0; j<jmax; j++)
-    {
-      n = j*nDev/jmax;
-      for (int k=0; k<kmax; k++)
-      {
-        ind = i+imax*((j-n*jmax/nDev)+(jmax/nDev)*k);
-        (*a).r[i][j][k] = set[n].h_output1[ind]/(simtime - tmovie*(double)startat);
-        (*a).p[i][j][k] = set[n].h_output2[ind]/set[n].h_output1[ind];
-        (*a).u[i][j][k] = set[n].h_output3[ind]/set[n].h_output1[ind];
-        (*a).v[i][j][k] = set[n].h_output4[ind]/set[n].h_output1[ind];
-        (*a).w[i][j][k] = set[n].h_output5[ind]/set[n].h_output1[ind];
-      }
-    }
-  result_file.write((char*)a, sizeof(result));
-  result_file.close();
-  #endif
  
   for (int n=0; n<nDev; n++)
   {
@@ -598,23 +455,6 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
     CudaSafeCall( cudaFree( set[n].top ) );
     #endif
 
-    #if file_flag==1
-    CudaSafeCall( cudaFree( set[n].d_output1 ) );
-    CudaSafeCall( cudaFreeHost( set[n].h_output1 ) );
-
-    CudaSafeCall( cudaFree( set[n].d_output2 ) );
-    CudaSafeCall( cudaFreeHost( set[n].h_output2 ) );
-
-    CudaSafeCall( cudaFree( set[n].d_output3 ) );
-    CudaSafeCall( cudaFreeHost( set[n].h_output3 ) );
-
-    CudaSafeCall( cudaFree( set[n].d_output4 ) );
-    CudaSafeCall( cudaFreeHost( set[n].h_output4 ) );
-
-    CudaSafeCall( cudaFree( set[n].d_output5 ) );
-    CudaSafeCall( cudaFreeHost( set[n].h_output5 ) );
-    #endif
-
     CudaSafeCall( cudaFree( set[n].val ) );
 
     CudaSafeCall( cudaFree( set[n].dt ) );
@@ -625,9 +465,7 @@ void kernel(bool restart, int startat, int morph, string morph_path, sdp B0, dou
     CudaSafeCall( cudaDeviceReset() );
   }
   delete[] lft,rgh,udr,top,val;
-  #if file_flag == 1
-  delete[] a;
-  #endif
+
 //                           END OF MAIN LOOP
 //============================================================================================
   return;
