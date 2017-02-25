@@ -61,15 +61,16 @@ string create_label()
   #if opac_flag == 1
   label += "_b"+int_to_string(B0/0.001)+"_w"+int_to_string(buff/0.001);
   #endif
-  #if plnt_flag == 1
-  label += "_p"+int_to_string(round(M_p/0.000003))+"_s"+int_to_string(round(100.0*sqrtf(epsilon)/sc_h));
+  #if plnt_flag == 2
+  label += "_pm"+int_to_string(round(M_p/0.000003))+"_s"+int_to_string(round(100.0*rs_fac));
+  #elif plnt_flag == 1
+  label += "_p"+int_to_string(round(M_p/0.000003))+"_s"+int_to_string(round(100.0*rs_fac));
   #endif
   label += "_i"+int_to_string(xmin*100.0)+"_o"+int_to_string(xmax*100.0);
   //if (visc_flag==1) label += "_a"+int_to_string(round((vis_nu/sc_h/sc_h)*100000.0));
-  if (visc_flag==1) label += "_a"+int_to_string(round(ss_alpha*1000.0));
+  if (visc_flag==1) label += "_a"+int_to_string(round(ss_alpha*10000.0));
   #if EOS == 1
-  label += "_isen";
-  label += "_sig"+int_to_string((p_alpha-1.5)*10.0);
+  label += "_g" + int_to_string(round(gam*10.0));
   #elif EOS == 0
   if (p_alpha + 0.5*p_beta - 1.5 == 1.5) label += "_flatvor";
   if (p_beta == 0.0) label += "_iso";
@@ -77,8 +78,12 @@ string create_label()
   #elif EOS == 2
   label += "_ad";
   #endif
-  if (FrRot>0.0) label += "_rot"+int_to_string(round(10.0*FrRot));
+  #if FrRot_flag == 1
+  label += "_rot";
+  #endif
+  #if FARGO_flag == 1
   label += "_fargo";
+  #endif
   return label;
 }
 

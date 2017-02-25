@@ -50,12 +50,12 @@ __global__ void output_lv1(hydr_ring *rings, sdp *dt_2D, body planet, sdp exclud
 {
   int i = blockIdx.x;
   int k = blockIdx.y;
-  int j;
+  int j, j0;
   int ik = i + gridDim.x * k;
   int tt = threadIdx.x;
 
   __shared__ sdp ridt[1024];
-  sdp tmp, rad, z, phi, r_hill;
+  sdp tmp, rad, phi;
 
   int tmax = blockDim.x;
   int loop = jmax/tmax;
@@ -68,17 +68,37 @@ __global__ void output_lv1(hydr_ring *rings, sdp *dt_2D, body planet, sdp exclud
 
     if (j<jmax)
     {
+      j0 = j + rings[ik].rot_j;
+      if (j0<0) j0 += jmax;
+      if (j0>=jmax) j0 -= jmax;
       rad = rings[ik].xc;
-      phi = rings[ik].yc[j];
+      phi = rings[ik].yc[j0];
     
-      #if plnt_flag == 1
-      r_hill = cmax(cpow(M_p/3.0,1.0/3.0),sc_h);
-      if (ndim == 2)
+      #if plnt_flag > 0
+      if (mode==0)
       {
-        if ( (rad-1.0)*(rad-1.0) + (phi-pi)*(phi-pi) > exclude*exclude )
+        tmp = rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j0] * rings[ik].zvol;
+        ridt[tt] = tmp;
+      }
+      else if (ndim==2 && mode==8)
+      {
+        if ( (rad-planet.x)*(rad-planet.x) + rad*rad*(phi-planet.y)*(phi-planet.y) > exclude*exclude )
+        {
+          tmp  = -star_planet_grav_rad_cyl(rad, phi, 0.0, planet);
+          tmp *= (rings[ik].r[j]-cpow(rings[ik].xc,-p_alpha)) * rings[ik].xvol * rings[ik].yvol[j0];
+          ridt[tt] = tmp;
+        }
+        else
+        {
+          ridt[tt] = 0.0;
+        }
+      }
+      else if (ndim==2 && mode==9)
+      {
+        if ( (rad-planet.x)*(rad-planet.x) + rad*rad*(phi-planet.y)*(phi-planet.y) > exclude*exclude )
         {
           tmp  = -star_planet_grav_azi_cyl(rad, phi, 0.0, planet);
-          tmp *= rad * rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j] * rings[ik].zvol;
+          tmp *= rad * (rings[ik].r[j]-cpow(rings[ik].xc,-p_alpha)) * rings[ik].xvol * rings[ik].yvol[j0];
           ridt[tt] = tmp;
         }
         else
@@ -86,37 +106,12 @@ __global__ void output_lv1(hydr_ring *rings, sdp *dt_2D, body planet, sdp exclud
           ridt[tt] = 0.0;
         }
       }
-      else if (ngeomz == 0)
+      else
       {
-        z = rings[ik].zc;
-        if ( (rad-1.0)*(rad-1.0) + (phi-pi)*(phi-pi) + z*z > exclude*exclude )
-        {
-          tmp  = -star_planet_grav_azi_cyl(rad, phi, z, planet);
-          tmp *= rad * rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j] * rings[ik].zvol;
-          ridt[tt] = tmp;
-        }
-        else
-        {
-          ridt[tt] = 0.0;
-        }
-      }
-      else if (ngeomz == 5)
-      {
-        z = rad*ccos(rings[ik].zc);
-        rad = csqrt(rad*rad-z*z);
-        if ( (rad-1.0)*(rad-1.0) + (phi-pi)*(phi-pi) + z*z > exclude*exclude )
-        {
-          tmp  = -star_planet_grav_azi_cyl(rad, phi, z, planet);
-          tmp *= rad * rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j] * rings[ik].zvol;
-          ridt[tt] = tmp;
-        }
-        else
-        {
-          ridt[tt] = 0.0;
-        }
+        ridt[tt] = 0.0;
       }
       #else
-      tmp = rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j] * rings[ik].zvol;
+      tmp = rings[ik].r[j] * rings[ik].xvol * rings[ik].yvol[j0] * rings[ik].zvol;
       ridt[tt] = tmp;
       #endif
     }
@@ -173,8 +168,7 @@ __global__ void output_lv3(sdp *dt_1D, sdp *output, int iblk)
 
 sdp GPU_output_reduction(GPU_plan *set, body planet, sdp exclude, int mode)
 {
-  exclude *= pow((M_p/3.0),1.0/3.0);
-  //exclude *= M_p/sc_h/sc_h;
+  exclude *= sc_h;
   sdp total = 0.0;
 
   for (int n=0; n<nDev; n++)
@@ -183,10 +177,15 @@ sdp GPU_output_reduction(GPU_plan *set, body planet, sdp exclude, int mode)
 
     output_lv1<<< set[n].t_grid , 1024 , 0 , set[n].stream >>>(set[n].rings, set[n].dt_2D, planet, exclude, mode);
     CudaCheckError();
+    #if ndim==3
     output_lv2<<< set[n].iblk , set[n].kblk , 0 , set[n].stream >>>(set[n].dt_2D, set[n].dt_1D);
     CudaCheckError();
     output_lv3<<< 1 , 1024 , 0 , set[n].stream >>>(set[n].dt_1D, set[n].d_output, set[n].iblk);
     CudaCheckError();
+    #else
+    output_lv3<<< 1 , 1024 , 0 , set[n].stream >>>(set[n].dt_2D, set[n].d_output, set[n].iblk);
+    CudaCheckError();
+    #endif
 
     CudaSafeCall( cudaMemcpyAsync( set[n].h_output, set[n].d_output, sizeof(sdp), cudaMemcpyDeviceToHost, set[n].stream) );
   }
