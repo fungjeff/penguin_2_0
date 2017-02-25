@@ -9,7 +9,7 @@
 
 //#########################################################################################
 
-__global__ void dt_lv1(hydr_ring *rings, sdp *dt_2D)
+__global__ void dt_lv1(hydr_ring *rings, sdp *dt_2D, sdp FrRot)
 {
   int i = blockIdx.x;
   int k = blockIdx.y;
@@ -109,18 +109,23 @@ __global__ void dt_lv3(sdp *dt_1D, sdp *output, int iblk)
 
 //=========================================================================================
 
-sdp get_dt(sdp dt, GPU_plan *set)
+sdp get_dt(sdp dt, GPU_plan *set, sdp FrRot)
 {
   for (int n=0; n<nDev; n++)
   {
     CudaSafeCall( cudaSetDevice(set[n].id) );
 
-    dt_lv1<<< set[n].t_grid , 1024 , 0 , set[n].stream >>>(set[n].rings, set[n].dt_2D);
+    dt_lv1<<< set[n].t_grid , 1024 , 0 , set[n].stream >>>(set[n].rings, set[n].dt_2D, FrRot);
     CudaCheckError();
+    #if ndim==3
     dt_lv2<<< set[n].iblk , set[n].kblk , 0 , set[n].stream >>>(set[n].dt_2D, set[n].dt_1D);
     CudaCheckError();
     dt_lv3<<< 1 , 1024 , 0 , set[n].stream >>>(set[n].dt_1D, set[n].dt, set[n].iblk);
     CudaCheckError();
+    #else
+    dt_lv3<<< 1 , 1024 , 0 , set[n].stream >>>(set[n].dt_2D, set[n].dt, set[n].iblk);
+    CudaCheckError();
+    #endif
 
     CudaSafeCall( cudaMemcpyAsync( set[n].h_dt, set[n].dt, sizeof(sdp), cudaMemcpyDeviceToHost, set[n].stream) );
   }
